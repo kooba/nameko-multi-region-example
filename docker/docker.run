@@ -15,4 +15,4 @@ RUN . /appenv/bin/activate; \
 EXPOSE 8000
 
 CMD . /appenv/bin/activate; \
-    /var/nameko/run.sh;
+     /var/nameko/run.sh;
