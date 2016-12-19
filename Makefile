@@ -34,6 +34,7 @@ build-service:
 build-all: build-base build-wheelbuilder run-wheelbuilder build-service
 
 run-app:
+		docker rm -f $(SERVICE_NAME)
 		docker run -it -d -p 8090:8000 \
 		--link rabbit:rabbit -e RABBIT_HOST=rabbit \
 		--name $(SERVICE_NAME) $(SERVICE_NAME):$(TAG)
