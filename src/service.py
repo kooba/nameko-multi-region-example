@@ -1,6 +1,3 @@
-"""Nameko service for multi-region example
-"""
-
 from datetime import datetime
 import json
 
@@ -9,6 +6,7 @@ from nameko.extensions import DependencyProvider
 from nameko.web.handlers import http
 
 CACHE = {}
+
 
 class Cache(DependencyProvider):
 
@@ -25,9 +23,10 @@ class Cache(DependencyProvider):
     def get_dependency(self, worker_ctx):
         return self.CacheApi(CACHE)
 
+
 class TimeService:
     """Nameko Service: products"""
-    name = 'time'
+    name = 'time_service'
 
     cache = Cache()
     dispatch = EventDispatcher()
@@ -49,7 +48,8 @@ class IndexerService:
     cache = Cache()
 
     @event_handler(
-        "time", "time_refresh", handler_type=BROADCAST, reliable_delivery=False
+        "time_service", "time_refresh",
+        handler_type=BROADCAST, reliable_delivery=False
     )
     def handle_time_update(self, payload):
         print("Received {}".format(payload))
