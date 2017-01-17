@@ -1,4 +1,4 @@
-FROM nameko-multi-resion-base
+FROM nameko-multi-region-base
 
 ADD wheelhouse /var/nameko/wheelhouse
 

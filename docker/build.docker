@@ -1,4 +1,4 @@
-FROM nameko-multi-resion-base
+FROM nameko-multi-region-base
 
 RUN apt-get update && \
     apt-get install -qyy \
