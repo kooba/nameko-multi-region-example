@@ -44,6 +44,7 @@ Setup 2 VM docker machines representing different regions
 ```sh
 $ docker-machine create --driver virtualbox europe
 $ docker-machine create --driver virtualbox asia
+$ docker-machine create --driver virtualbox america
 ```
 
 ### Build and deploy Service
@@ -92,15 +93,19 @@ $ eval $(docker-machine env europe)
 $ docker exec rabbit sh -c "rabbitmqctl set_parameter federation-upstream asia-upstream '{\"uri\":\"amqp://192.168.99.103:5672\"}'"
 Setting runtime parameter "asia-upstream" for component "federation-upstream" to "{\"uri\":\"amqp://192.168.99.103:5672\"}" ...
 
-$ docker exec rabbit sh -c "rabbitmqctl set_policy --apply-to queues federate-queues \"^(evt-.*|fed\\..*)$\" '{\"federation-upstream-set\":\"all\"}'"
-Setting policy "federate-queues" for pattern "^(evt-.*|fed\\..*)$" to "{\"federation-upstream-set\":\"all\"}" with priority "0" ...
+$ docker exec rabbit sh -c "rabbitmqctl set_policy --apply-to exchanges federate-exchanges \".*\.events$\" '{\"federation-upstream-set\":\"all\"}'"
+Setting policy "federate-exchanges" for pattern ".*\\.events$" to "{\"federation-upstream-set\":\"all\"}" with priority "0" ...
+
+$ docker exec rabbit sh -c "rabbitmqctl set_policy --apply-to queues federate-queues \"^(fed\..*)$\" '{\"federation-upstream-set\":\"all\"}'"
+Setting policy "federate-queues" for pattern "^(fed\\..*)$" to "{\"federation-upstream-set\":\"all\"}" with priority "0" ...
+
 
 
 $ eval $(docker-machine env asia)
 $ docker exec rabbit sh -c "rabbitmqctl set_parameter federation-upstream asia-upstream '{\"uri\":\"amqp://192.168.99.102:5672\"}'"
 Setting runtime parameter "asia-upstream" for component "federation-upstream" to "{\"uri\":\"amqp://192.168.99.102:5672\"}" ...
 
-$ docker exec rabbit sh -c "rabbitmqctl set_policy --apply-to queues federate-queues \"^(evt-.*|fed\\..*)$\" '{\"federation-upstream-set\":\"all\"}'"
+$ docker exec rabbit sh -c "rabbitmqctl set_policy --apply-to queues federate-queues \"^(fed\..*)$\" '{\"federation-upstream-set\":\"all\"}'"
 Setting policy "federate-queues" for pattern "^(evt-.*|fed\\..*)$" to "{\"federation-upstream-set\":\"all\"}" with priority "0" ...
 ```
 

@@ -1,0 +1,23 @@
+version: "2"
+services:
+  rabbit:
+    container_name: nameko-multi-region-example-rabbitmq
+    image: jakubborys/nameko-multi-region-example-rabbitmq:latest
+    ports:
+        - "15672:15672"
+
+  products:
+    container_name: nameko-multi-region-example-products
+    image: jakubborys/nameko-multi-region-example-products:latest
+    depends_on:
+        - rabbit
+    ports:
+        - "8000:8000"
+    links:
+        - "rabbit:nameko-multi-region-example-rabbitmq"
+    environment:
+        RABBIT_PASSWORD: "guest"
+        RABBIT_USER: "guest"
+        RABBIT_HOST: "rabbit"
+        RABBIT_PORT: "5672"
+        RABBIT_MANAGEMENT_PORT: "15672"
