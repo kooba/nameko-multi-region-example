@@ -1,4 +1,3 @@
-from datetime import datetime
 import json
 
 from nameko.events import EventDispatcher, event_handler, BROADCAST
@@ -24,33 +23,35 @@ class Cache(DependencyProvider):
         return self.CacheApi(CACHE)
 
 
-class TimeService:
-    """Nameko Service: products"""
-    name = 'time_service'
+class ProductsService:
+    name = 'products_service'
 
     cache = Cache()
     dispatch = EventDispatcher()
 
-    @http('GET', '/time')
-    def get_time(self, request):
-        return json.dumps({'time': self.cache.get('time')})
+    @http('GET', '/products/<int:product_id>')
+    def get_time(self, request, product_id):
+        return json.dumps(
+            {'product': self.cache.get('product_{}'.format(product_id))})
 
-    @http('PUT', '/time')
-    def update_time(self, request):
-        payload = {'time': datetime.now().isoformat()}
-        self.dispatch("time_refresh", payload)
-        return json.dumps({'payload': payload})
+    @http('PUT', '/products/<int:product_id>')
+    def update_time(self, request, product_id):
+        request_data = request.get_data(as_text=True)
+        payload = json.loads(request_data)
+        payload['product_id'] = product_id
+        self.dispatch("product_update", payload)
+        return json.dumps({'product': payload})
 
 
 class IndexerService:
-    name = 'indexer'
+    name = 'indexer_service'
 
     cache = Cache()
 
     @event_handler(
-        "time_service", "time_refresh",
+        "products_service", "product_update",
         handler_type=BROADCAST, reliable_delivery=False
     )
-    def handle_time_update(self, payload):
+    def handle_product_update(self, payload):
         print("Received {}".format(payload))
-        self.cache.update('time', payload['time'])
+        self.cache.update('product_{}'.format(payload['product_id']), payload)

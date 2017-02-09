@@ -99,3 +99,14 @@ cleanup-hosts:
 		eval $$(docker-machine env $$region) && \
 		docker rm -f $(SERVICE_NAME) && docker rm -f $(RABBIT_NAME); \
 	done
+
+run-rabbit:
+	docker run -d -p 15682:15672 --hostname rabbit \
+	-e RABBITMQ_ERLANG_COOKIE='24261958953861120' \
+	--name $(RABBIT_NAME) $(RABBIT_NAME):$(TAG)
+
+run-app:
+	docker run -d -p 8090:8000 \
+	--link rabbit:$(RABBIT_NAME) -e RABBIT_HOST="rabbit" \
+	-e RABBIT_PORT="5672" -e RABBIT_MANAGEMENT_PORT="15672" \
+	--name $(SERVICE_NAME) $(SERVICE_NAME):$(TAG)
