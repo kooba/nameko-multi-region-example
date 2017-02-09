@@ -32,22 +32,22 @@ push-to-docker-hub:
 	docker push jakubborys/$(SERVICE_NAME):$(TAG)
 	docker push jakubborys/$(RABBIT_NAME):$(TAG)
 
-# Provision Docker Hosts for every region
+# Provision Docker Hosts for each Region
 
 create-machines:
-	for region in $(REGIONS) ; do \
+	@for region in $(REGIONS) ; do \
 		docker-machine create --driver virtualbox $$region; \
 	done
 
 deploy-images:
-	for region in $(REGIONS) ; do \
+	@for region in $(REGIONS) ; do \
 		eval $$(docker-machine env $$region) && docker-compose -f docker-compose/common.yml -f docker-compose/$$region.yml up -d; \
 	done
 
-# RabbitMQ federation setup
+# RabbitMQ Federation Setup
 
 federation-upstreams:
-	for region in $(REGIONS) ; do \
+	@for region in $(REGIONS) ; do \
 		eval $$(docker-machine env $$region) ; \
 		regions=($(REGIONS)) remove=$$region && upstream_hosts="$${regions[@]/$$remove}" ; \
 			for upstream_host in $$upstream_hosts ; do \
@@ -58,14 +58,14 @@ federation-upstreams:
 	done
 
 federation-exchange-policy:
-	for region in $(REGIONS) ; do \
+	@for region in $(REGIONS) ; do \
 		eval $$(docker-machine env $$region) ; \
 		docker exec $(RABBIT_NAME) sh -c "rabbitmqctl set_policy --apply-to exchanges \
 		federated-exchanges \".*\.events$$\" '{\"federation-upstream-set\":\"all\"}'" ; \
 	done
 
 federation-queue-policy:
-	for region in $(REGIONS) ; do \
+	@for region in $(REGIONS) ; do \
 		eval $$(docker-machine env $$region) ; \
 		docker exec $(RABBIT_NAME) sh -c "rabbitmqctl set_policy --apply-to queues \
 		federated-queues \"^(fed\..*)$$\" '{\"federation-upstream-set\":\"all\"}'" ; \
@@ -75,21 +75,27 @@ setup-federation: federation-upstreams federation-exchange-policy federation-que
 
 # Handy utility commands 
 
-cleanup-hosts:
-	for region in europe asia america ; do \
-		eval $$(docker-machine env $$region) && docker rm -f $(SERVICE_NAME) && docker rm -f $(RABBIT_NAME); \
-	done
-
 list-services:
-	for region in europe asia america ; do \
+	@for region in $(REGIONS) ; do \
 		eval $$(docker-machine env $$region) && docker ps; \
 	done
 
 docker-command:
-	eval $$(docker-machine env $(R)) && $(CMD)
+	@eval $$(docker-machine env $(R)) && $(CMD)
 
 start-hosts:
-	for region in $(REGIONS) ; do \
+	@for region in $(REGIONS) ; do \
 		docker-machine start $$region; \
 		docker-machine regenerate-certs $$region; \
+	done
+
+stop-hosts:
+	@for region in $(REGIONS) ; do \
+		docker-machine stop $$region; \
+	done
+
+cleanup-hosts:
+	@for region in $(REGIONS) ; do \
+		eval $$(docker-machine env $$region) && \
+		docker rm -f $(SERVICE_NAME) && docker rm -f $(RABBIT_NAME); \
 	done
