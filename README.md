@@ -102,6 +102,7 @@ Setting policy "federate-queues" for pattern "^(fed\\..*)$" to "{\"federation-up
 
 
 $ eval $(docker-machine env asia)
+
 $ docker exec rabbit sh -c "rabbitmqctl set_parameter federation-upstream asia-upstream '{\"uri\":\"amqp://192.168.99.102:5672\"}'"
 Setting runtime parameter "asia-upstream" for component "federation-upstream" to "{\"uri\":\"amqp://192.168.99.102:5672\"}" ...
 

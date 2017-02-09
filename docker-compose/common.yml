@@ -5,6 +5,8 @@ services:
     image: jakubborys/nameko-multi-region-example-rabbitmq:latest
     ports:
         - "15672:15672"
+        - "5672:5672"
+    restart: always
 
   products:
     container_name: nameko-multi-region-example-products
@@ -21,3 +23,4 @@ services:
         RABBIT_HOST: "rabbit"
         RABBIT_PORT: "5672"
         RABBIT_MANAGEMENT_PORT: "15672"
+    restart: always
