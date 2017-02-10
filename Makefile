@@ -39,7 +39,7 @@ create-machines:
 		docker-machine create --driver virtualbox $$region; \
 	done
 
-deploy-images:
+deploy-services:
 	@for region in $(REGIONS) ; do \
 		eval $$(docker-machine env $$region) && docker-compose -f docker-compose/common.yml -f docker-compose/$$region.yml up -d; \
 	done
