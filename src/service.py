@@ -44,7 +44,6 @@ class ProductsService:
 
     @http('POST', '/products')
     def add_product(self, request):
-        import pdb; pdb.set_trace()
         try:
             payload = Product(strict=True).loads(
                 request.get_data(as_text=True)
@@ -60,16 +59,18 @@ class ProductsService:
     @http('PUT', '/products/<int:product_id>')
     def update_product(self, request, product_id):
         try:
-            payload = ProductBase(strict=True).load(
+            payload = ProductBase(strict=True).loads(
                 request.get_data(as_text=True)
-            )
+            ).data
         except ValidationError as err:
             return 400, json.dumps({
                 'error': 'BAD_REQUEST',
                 'message': err.messages
             })
         payload['id'] = product_id
-        self.dispatch("product_update", payload)
+        self.dispatch(
+            'product_update', Product(strict=True).dump(payload).data
+        )
         return 200, ''
 
 
@@ -79,13 +80,17 @@ class IndexerService:
     cache = Cache()
 
     @event_handler(
-        "products", "product_update",
+        'products', 'product_update',
+        handler_type=BROADCAST, reliable_delivery=False
+    )
+    @event_handler(
+        'products', 'product_add',
         handler_type=BROADCAST, reliable_delivery=False
     )
     def handle_product_update(self, payload):
         print("Received {}".format(payload))
-
-        # get product and update existing
-        self.cache.update('product_{}'.format(payload['product_id']), payload)
-
-    # def handle_add_product
+        payload = Product(strict=True).load(payload).data
+        self.cache.update(
+            payload['id'],
+            payload
+        )

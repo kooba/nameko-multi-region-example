@@ -3,7 +3,7 @@ from collections import namedtuple
 
 from nameko.testing.services import replace_dependencies
 
-from src.service import ProductsService
+from src.service import IndexerService, ProductsService
 
 
 @pytest.fixture
@@ -16,7 +16,7 @@ def config(rabbit_config, web_config):
 @pytest.fixture
 def create_service_meta(container_factory, config):
 
-    def create(*dependencies, **dependency_map):
+    def create(service_cls, *dependencies, **dependency_map):
         """ Create service instance with specified dependencies mocked
         """
         dependency_names = list(dependencies) + list(dependency_map.keys())
@@ -24,7 +24,7 @@ def create_service_meta(container_factory, config):
         ServiceMeta = namedtuple(
             'ServiceMeta', ['container'] + dependency_names
         )
-        container = container_factory(ProductsService, config)
+        container = container_factory(service_cls, config)
 
         mocked_dependencies = replace_dependencies(
             container, *dependencies, **dependency_map
@@ -40,5 +40,10 @@ def create_service_meta(container_factory, config):
 
 
 @pytest.fixture
-def service(create_service_meta):
-    return create_service_meta('dispatch')
+def products_service(create_service_meta):
+    return create_service_meta(ProductsService, 'dispatch')
+
+
+@pytest.fixture
+def indexer_service(create_service_meta):
+    return create_service_meta(IndexerService)

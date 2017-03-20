@@ -1,7 +1,11 @@
 import json
 import pytest
+
 from mock import call, patch
-from src.service import ProductsService, CACHE
+from nameko.standalone.events import event_dispatcher
+from nameko.testing.services import entrypoint_waiter
+
+from src.service import CACHE
 
 
 @pytest.fixture
@@ -17,12 +21,12 @@ def data():
 
 class TestProductService:
 
-    def test_will_get_product(self, service, web_session, data):
+    def test_will_get_product(self, products_service, web_session, data):
         response = web_session.get('/products/1')
         assert response.status_code == 200
         assert response.json() == {'price': '100.0', 'name': 'Tesla', 'id': 1}
 
-    def test_product_not_found(self, service, web_session):
+    def test_product_not_found(self, products_service, web_session):
         response = web_session.get('/products/1')
         assert response.status_code == 404
         assert response.json() == {
@@ -30,19 +34,15 @@ class TestProductService:
             'message': 'Product not found'
         }
 
-    def test_will_add_product(self, service, web_session):
-        payload = {
-                'price': '100.0',
-                'name': 'Tesla',
-                'id': 1
-            }
+    def test_will_add_product(self, products_service, web_session):
+        payload = {'price': '100.0', 'name': 'Tesla', 'id': 1}
         response = web_session.post('/products', data=json.dumps(payload))
         assert response.status_code == 200
-        assert service.dispatch.call_args_list == [
+        assert products_service.dispatch.call_args_list == [
             call('product_add', payload)
         ]
 
-    def test_fail_adding_product(self, service, web_session):
+    def test_fail_adding_product(self, products_service, web_session):
         payload = {}
         response = web_session.post('/products', data=json.dumps(payload))
         assert response.status_code == 400
@@ -52,20 +52,40 @@ class TestProductService:
                 'id': ['Missing data for required field.']
             }
         }
-    # def test_will_update_product
-    # def will_fail_updating_product
+
+    def test_will_update_product(self, products_service, web_session, data):
+        payload = {'price': '200.0', 'name': 'Tesla'}
+        response = web_session.put('/products/1', data=json.dumps(payload))
+        assert response.status_code == 200
+
+        payload['id'] = 1
+        assert products_service.dispatch.call_args_list == [
+            call('product_update', payload)
+        ]
+
+    def test_will_fail_updating_product(self, products_service, web_session):
+        payload = {'price': 'foo'}
+        response = web_session.put('/products/1', data=json.dumps(payload))
+        assert response.status_code == 400
+        assert response.json() == {
+            'error': 'BAD_REQUEST',
+            'message': {
+                'price': ['Not a valid number.']
+            }
+        }
 
 
-def test_will_update_product(service, web_session):
-    payload = {
-        'price': '200.00'
-    }
-    product_id = 1
-    response = web_session.put(
-        '/products/{}'.format(product_id), data=json.dumps(payload)
-    )
-    results = response.json()
-    assert response.status_code == 200
-    expected_payload = payload.copy()
-    expected_payload['product_id'] = product_id
-    assert results == {'product': expected_payload}
+class TestIndexerService:
+
+    def test_will_update_cache(self, indexer_service, config, data):
+        original_price = CACHE[1]['price']
+
+        payload = {'price': '101.0', 'name': 'Tesla', 'id': 1}
+
+        container = indexer_service.container
+        dispatch = event_dispatcher(config)
+
+        with entrypoint_waiter(container, 'handle_product_update'):
+            dispatch('products', 'product_update', payload)
+        assert CACHE[1]['price'] > original_price
+
