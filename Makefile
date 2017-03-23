@@ -73,7 +73,7 @@ federation-queue-policy:
 
 setup-federation: federation-upstreams federation-exchange-policy federation-queue-policy
 
-# Handy utility commands 
+# Handy utility commands
 
 list-services:
 	@for region in $(REGIONS) ; do \
@@ -105,8 +105,11 @@ run-rabbit:
 	-e RABBITMQ_ERLANG_COOKIE='24261958953861120' \
 	--name $(RABBIT_NAME) $(RABBIT_NAME):$(TAG)
 
-run-app:
+run-service-container:
 	docker run -d -p 8090:8000 \
 	--link rabbit:$(RABBIT_NAME) -e RABBIT_HOST="rabbit" \
 	-e RABBIT_PORT="5672" -e RABBIT_MANAGEMENT_PORT="15672" \
 	--name $(SERVICE_NAME) $(SERVICE_NAME):$(TAG)
+
+run-service:
+	nameko run --config config.yml src.service --backdoor 3000

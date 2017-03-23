@@ -3,3 +3,4 @@ services:
   products:
     environment:
         REGION: asia
+        BLACKLIST_ENTRYPOINTS: ['consume_order']
