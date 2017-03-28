@@ -43,8 +43,10 @@ deploy-services:
 	@for region in $(REGIONS) ; do \
 		eval $$(docker-machine env $$region) && \
 		docker-compose -f docker-compose/common.yml -f docker-compose/$$region.yml pull && \
-		docker-compose -f docker-compose/common.yml -f docker-compose/$$region.yml up -d; \
+		docker-compose -f docker-compose/common.yml -f docker-compose/$$region.yml up -d --force-recreate; \
 	done
+
+build-and-deploy: build-all push-to-docker-hub deploy-services
 
 # RabbitMQ Federation Setup
 
@@ -129,3 +131,6 @@ add-product:
 order-product:
 	curl -XPOST $$(docker-machine ip asia):8000/orders \
 	-d '{"product_id": 1, "quantity": 1}'
+
+calculate-tax:
+	curl -XPOST $$(docker-machine ip asia):8000/tax/asia -d '{"foo": "bar"}'

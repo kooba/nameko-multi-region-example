@@ -1,19 +1,26 @@
 import kombu.serialization
-from kombu import Queue
+from kombu import Exchange, Queue
 from kombu.common import maybe_declare
 from nameko.amqp import get_connection, get_producer
 from nameko.constants import AMQP_URI_CONFIG_KEY, DEFAULT_SERIALIZER
 from nameko.exceptions import UnserializableValueError, serialize
 from nameko.messaging import Consumer as NamekoConsumer
 
-from .service import (
-    orders_exchange, ROUTING_KEY_CALCULATE_TAXES,
-    ROUTING_KEY_CALCULATE_TAXES_REPLY
-)
-
 REGIONS = ['europe', 'asia', 'america']
 
-queue_calculate_taxes = Queue(
+ROUTING_KEY_ORDER_PRODUCT = 'order_product'
+ROUTING_KEY_CALCULATE_TAXES = 'calculate_taxes'
+ROUTING_KEY_CALCULATE_TAXES_REPLY = 'calculate_taxes_reply'
+
+orders_exchange = Exchange(name='orders')
+
+order_queue = Queue(
+    exchange=orders_exchange,
+    routing_key=ROUTING_KEY_ORDER_PRODUCT,
+    name='fed.{}'.format(ROUTING_KEY_ORDER_PRODUCT)
+)
+
+calculate_taxes_queue = Queue(
     exchange=orders_exchange,
     routing_key=ROUTING_KEY_CALCULATE_TAXES,
     name='fed.{}'.format(ROUTING_KEY_CALCULATE_TAXES)
@@ -21,16 +28,32 @@ queue_calculate_taxes = Queue(
 
 
 class ReplyConsumer(NamekoConsumer):
+
+    def __init__(self, **kwargs):
+        super(ReplyConsumer, self).__init__(None, kwargs)
+
     def handle_result(self, message, worker_ctx, result=None, exc_info=None):
         result, exc_info = self.send_response(message, result, exc_info)
         self.handle_message_processed(message, result, exc_info)
         return result, exc_info
 
     def setup(self):
-        """Bind reply queues in all regions to `orders` exchange"""
         super(ReplyConsumer, self).setup()
         config = self.container.config
 
+        """Region specific queue"""
+        self.queue = Queue(
+            exchange=orders_exchange,
+            routing_key='{}_{}'.format(
+                config['REGION'],
+                ROUTING_KEY_CALCULATE_TAXES
+            ),
+            name='fed.{}'.format(
+                ROUTING_KEY_CALCULATE_TAXES
+            )
+        )
+
+        """Bind reply queues in all regions to `orders` exchange"""
         with get_connection(config[AMQP_URI_CONFIG_KEY]) as conn:
 
             maybe_declare(orders_exchange, conn)
@@ -77,3 +100,26 @@ class ReplyConsumer(NamekoConsumer):
         return result, error
 
 consume_and_reply = ReplyConsumer.decorator
+
+
+class DynamicConsumer(NamekoConsumer):
+    """
+    Alternative implementation of nameko.messaging.Consumer
+    to allow for dynamic queue name declaration.
+    """
+    def __init__(self, **kwargs):
+        super(DynamicConsumer, self).__init__(None, kwargs)
+
+    def setup(self):
+        reply_queue_name = "{}_{}".format(
+            self.container.config['REGION'], ROUTING_KEY_CALCULATE_TAXES_REPLY
+        )
+        queue = Queue(
+            exchange=orders_exchange,
+            routing_key=reply_queue_name,
+            name='fed.{}'.format(reply_queue_name)
+        )
+        self.queue = queue
+        super(DynamicConsumer, self).setup()
+
+consume_reply = DynamicConsumer.decorator

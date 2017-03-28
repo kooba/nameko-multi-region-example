@@ -1,28 +1,20 @@
 import json
 
-from kombu import Exchange, Queue
+
 from marshmallow import ValidationError
 from nameko.events import EventDispatcher, event_handler, BROADCAST
 from nameko.extensions import DependencyProvider
 from nameko.messaging import Publisher, consume
 from nameko.web.handlers import http
 
-from .messaging import consume_and_reply, queue_calculate_taxes
+from .messaging import (
+    consume_and_reply, consume_reply, calculate_taxes_queue, order_queue,
+    orders_exchange, ROUTING_KEY_CALCULATE_TAXES,
+    ROUTING_KEY_CALCULATE_TAXES_REPLY, ROUTING_KEY_ORDER_PRODUCT
+)
 from .models import Order, Product
 
 CACHE = {}
-
-ROUTING_KEY_ORDER_PRODUCT = 'order_product'
-ROUTING_KEY_CALCULATE_TAXES = 'calculate_taxes'
-ROUTING_KEY_CALCULATE_TAXES_REPLY = 'calculate_taxes_reply'
-
-orders_exchange = Exchange(name='orders')
-
-order_queue = Queue(
-    exchange=orders_exchange,
-    routing_key=ROUTING_KEY_ORDER_PRODUCT,
-    name='fed.{}'.format(ROUTING_KEY_ORDER_PRODUCT)
-)
 
 
 class Cache(DependencyProvider):
@@ -50,9 +42,10 @@ class ProductsService:
     name = 'products'
 
     cache = Cache()
+    config = Config()
     dispatch = EventDispatcher()
     order_product_publisher = Publisher(queue=order_queue)
-    config = Config()
+    calculate_taxes_publisher = Publisher(exchange=orders_exchange)
 
     @http('GET', '/products/<int:product_id>')
     def get_product(self, request, product_id):
@@ -129,6 +122,21 @@ class ProductsService:
             'product_update', Product(strict=True).dump(product).data
         )
 
+    @http('POST', '/tax/<string:region>')
+    def calculate_tax(self, request, region):
+
+        self.calculate_taxes_publisher(
+            {},
+            routing_key="{}_{}".format(region, ROUTING_KEY_CALCULATE_TAXES),
+            reply_to="{}_{}".format(
+                self.config['REGION'], ROUTING_KEY_CALCULATE_TAXES_REPLY)
+        )
+        return 200, ''
+
+    @consume_reply()
+    def record_tax_calculation(self, payload):
+        print(payload)
+
 
 class IndexerService:
     name = 'indexer'
@@ -167,7 +175,7 @@ class TaxesService:
 
     config = Config()
 
-    @consume_and_reply(queue=queue_calculate_taxes)
+    @consume_and_reply(queue=calculate_taxes_queue)
     def calculate_taxes(self, payload):
         return {
             'tax': 'You tax calculated for region {} was 0'.format(
