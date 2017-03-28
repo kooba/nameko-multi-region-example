@@ -7,11 +7,14 @@ from nameko.extensions import DependencyProvider
 from nameko.messaging import Publisher, consume
 from nameko.web.handlers import http
 
+from .messaging import consume_and_reply, queue_calculate_taxes
 from .models import Order, Product
 
 CACHE = {}
 
 ROUTING_KEY_ORDER_PRODUCT = 'order_product'
+ROUTING_KEY_CALCULATE_TAXES = 'calculate_taxes'
+ROUTING_KEY_CALCULATE_TAXES_REPLY = 'calculate_taxes_reply'
 
 orders_exchange = Exchange(name='orders')
 
@@ -38,7 +41,6 @@ class Cache(DependencyProvider):
         return self.CacheApi(CACHE)
 
 
-# TODO: Remove
 class Config(DependencyProvider):
     def get_dependency(self, worker_ctx):
         return self.container.config.copy()
@@ -129,7 +131,7 @@ class ProductsService:
 
 
 class IndexerService:
-    name = 'indexer_service'
+    name = 'indexer'
 
     cache = Cache()
 
@@ -158,3 +160,17 @@ class IndexerService:
             payload['id'],
             payload
         )
+
+
+class TaxesService:
+    name = 'taxes'
+
+    config = Config()
+
+    @consume_and_reply(queue=queue_calculate_taxes)
+    def calculate_taxes(self, payload):
+        return {
+            'tax': 'You tax calculated for region {} was 0'.format(
+                self.config['REGION']
+            )
+        }
