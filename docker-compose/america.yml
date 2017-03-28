@@ -3,4 +3,4 @@ services:
   products:
     environment:
         REGION: america
-        BLACKLIST_ENTRYPOINTS: ['consume_order']
+        BLACKLIST_ENTRYPOINTS: 'consume_order'

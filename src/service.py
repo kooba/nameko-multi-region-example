@@ -54,6 +54,8 @@ class ProductsService:
 
     @http('GET', '/products/<int:product_id>')
     def get_product(self, request, product_id):
+        """ Get product from local cache
+        """
         product = self.cache.get(product_id)
         if not product:
             return 404, json.dumps({
@@ -64,6 +66,11 @@ class ProductsService:
 
     @http('POST', '/products')
     def add_product(self, request):
+        """ Add product to cache in every region
+
+        This endpoint can be called in any region and will dispatch event
+        which will be handled by indexer's `handle_product_add` in all regions
+        """
         try:
             payload = Product(strict=True).loads(
                 request.get_data(as_text=True)
@@ -76,9 +83,15 @@ class ProductsService:
         self.dispatch('product_add', Product(strict=True).dump(payload).data)
         return 200, ''
 
-    # TODO: black list of this endpoint example
     @http('POST', '/orders')
     def order_product(self, request):
+        """ HTTP entrypoint for ordering products
+
+        This entrypoint can be called in any region but message will be
+        published on a federated `fed.order_product` queue that is only
+        consumed in `europe` region where master database and service with
+        write permissions to it lives.
+        """
         try:
             payload = Order(strict=True).loads(
                 request.get_data(as_text=True)
@@ -96,11 +109,19 @@ class ProductsService:
 
     @consume(queue=order_queue)
     def consume_order(self, payload):
+        """ Consumes order payloads
+
+        For our example, this consumer is only enabled in `europe` region.
+        `asia` and `america` regions have this consumer disabled by setting
+        `ENTRYPOINT_BLACKLIST` config value to `consume_order`.
+        Custom implementation of ServiceContainer (container.py) uses this
+        value to blacklist specific entrypoints.
+        """
         print("Consuming order")
         product = self.cache.get(payload['product_id'])
         product['quantity'] -= payload['quantity']
 
-        # TODO: Write to master DB?
+        # Write to master database here...
 
         self.dispatch(
             'product_update', Product(strict=True).dump(product).data

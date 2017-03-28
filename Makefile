@@ -41,7 +41,9 @@ create-machines:
 
 deploy-services:
 	@for region in $(REGIONS) ; do \
-		eval $$(docker-machine env $$region) && docker-compose -f docker-compose/common.yml -f docker-compose/$$region.yml up -d; \
+		eval $$(docker-machine env $$region) && \
+		docker-compose -f docker-compose/common.yml -f docker-compose/$$region.yml pull && \
+		docker-compose -f docker-compose/common.yml -f docker-compose/$$region.yml up -d; \
 	done
 
 # RabbitMQ Federation Setup
@@ -77,6 +79,7 @@ setup-federation: federation-upstreams federation-exchange-policy federation-que
 
 list-services:
 	@for region in $(REGIONS) ; do \
+		echo $$region && docker-machine ip $$region && \
 		eval $$(docker-machine env $$region) && docker ps; \
 	done
 
@@ -113,3 +116,16 @@ run-service-container:
 
 run-service:
 	nameko run --config config.yml src.service --backdoor 3000
+
+
+# Commans from example
+get-product:
+	curl $$(docker-machine ip europe):8000/products/1
+
+add-product:
+	curl -XPOST $$(docker-machine ip europe):8000/products \
+	-d '{"price": "100.00", "name": "Tesla", "id": 1, "quantity": 100}'
+
+order-product:
+	curl -XPOST $$(docker-machine ip asia):8000/orders \
+	-d '{"product_id": 1, "quantity": 1}'
