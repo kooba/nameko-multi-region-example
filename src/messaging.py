@@ -20,12 +20,6 @@ order_queue = Queue(
     name='fed.{}'.format(ROUTING_KEY_ORDER_PRODUCT)
 )
 
-calculate_taxes_queue = Queue(
-    exchange=orders_exchange,
-    routing_key=ROUTING_KEY_CALCULATE_TAXES,
-    name='fed.{}'.format(ROUTING_KEY_CALCULATE_TAXES)
-)
-
 
 class ReplyConsumer(NamekoConsumer):
 
@@ -48,17 +42,28 @@ class ReplyConsumer(NamekoConsumer):
                 config['REGION'],
                 ROUTING_KEY_CALCULATE_TAXES
             ),
-            name='fed.{}'.format(
-                ROUTING_KEY_CALCULATE_TAXES
+            name='fed.{}_{}'.format(
+                config['REGION'], ROUTING_KEY_CALCULATE_TAXES
             )
         )
 
-        """Bind reply queues in all regions to `orders` exchange"""
+        """Bind reply queues for all regions to `orders` exchange"""
         with get_connection(config[AMQP_URI_CONFIG_KEY]) as conn:
 
             maybe_declare(orders_exchange, conn)
 
             for region in REGIONS:
+
+                maybe_declare(Queue(
+                    exchange=orders_exchange,
+                    routing_key='{}_{}'.format(
+                        region, ROUTING_KEY_CALCULATE_TAXES
+                    ),
+                    name='fed.{}_{}'.format(
+                        region, ROUTING_KEY_CALCULATE_TAXES
+                    )
+                ), conn)
+
                 maybe_declare(Queue(
                     exchange=orders_exchange,
                     routing_key='{}_{}'.format(

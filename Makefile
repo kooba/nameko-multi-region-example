@@ -46,8 +46,6 @@ deploy-services:
 		docker-compose -f docker-compose/common.yml -f docker-compose/$$region.yml up -d --force-recreate; \
 	done
 
-build-and-deploy: build-all push-to-docker-hub deploy-services
-
 # RabbitMQ Federation Setup
 
 federation-upstreams:
@@ -76,6 +74,8 @@ federation-queue-policy:
 	done
 
 setup-federation: federation-upstreams federation-exchange-policy federation-queue-policy
+
+build-and-deploy: build-all push-to-docker-hub deploy-services setup-federation
 
 # Handy utility commands
 
@@ -133,4 +133,4 @@ order-product:
 	-d '{"product_id": 1, "quantity": 1}'
 
 calculate-tax:
-	curl -XPOST $$(docker-machine ip asia):8000/tax/asia -d '{"foo": "bar"}'
+	curl -XPOST $$(docker-machine ip europe):8000/tax/asia -d '{"foo": "bar"}'

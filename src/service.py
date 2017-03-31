@@ -1,5 +1,5 @@
 import json
-
+import logging
 
 from marshmallow import ValidationError
 from nameko.events import EventDispatcher, event_handler, BROADCAST
@@ -8,7 +8,7 @@ from nameko.messaging import Publisher, consume
 from nameko.web.handlers import http
 
 from .messaging import (
-    consume_and_reply, consume_reply, calculate_taxes_queue, order_queue,
+    consume_and_reply, consume_reply, order_queue,
     orders_exchange, ROUTING_KEY_CALCULATE_TAXES,
     ROUTING_KEY_CALCULATE_TAXES_REPLY, ROUTING_KEY_ORDER_PRODUCT
 )
@@ -112,7 +112,7 @@ class ProductsService:
         Custom implementation of ServiceContainer (container.py) uses this
         value to blacklist specific entrypoints.
         """
-        print("Consuming order")
+        logging.info("Consuming order")
         product = self.cache.get(payload['product_id'])
         product['quantity'] -= payload['quantity']
 
@@ -125,17 +125,20 @@ class ProductsService:
     @http('POST', '/tax/<string:region>')
     def calculate_tax(self, request, region):
 
+        this_regions = self.config['REGION']
+
         self.calculate_taxes_publisher(
             {},
             routing_key="{}_{}".format(region, ROUTING_KEY_CALCULATE_TAXES),
             reply_to="{}_{}".format(
-                self.config['REGION'], ROUTING_KEY_CALCULATE_TAXES_REPLY)
+                this_regions, ROUTING_KEY_CALCULATE_TAXES_REPLY
+            )
         )
         return 200, ''
 
     @consume_reply()
     def record_tax_calculation(self, payload):
-        print(payload)
+        logging.info(payload)
 
 
 class IndexerService:
@@ -148,7 +151,7 @@ class IndexerService:
         handler_type=BROADCAST, reliable_delivery=False
     )
     def handle_product_add(self, payload):
-        print("Handling product add: {}".format(payload))
+        logging.info("Handling product add: {}".format(payload))
         payload = Product(strict=True).load(payload).data
         self.cache.update(
             payload['id'],
@@ -160,7 +163,7 @@ class IndexerService:
         handler_type=BROADCAST, reliable_delivery=False
     )
     def handle_product_update(self, payload):
-        print("Handling product update: {}".format(payload))
+        logging.info("Handling product update: {}".format(payload))
         payload = Product(strict=True).load(payload).data
         product = self.cache.get(payload['id'])
         product.update(payload)
@@ -175,10 +178,10 @@ class TaxesService:
 
     config = Config()
 
-    @consume_and_reply(queue=calculate_taxes_queue)
+    @consume_and_reply()
     def calculate_taxes(self, payload):
+        this_region = self.config['REGION']
+        logging.info("Received request in {}".format(this_region))
         return {
-            'tax': 'You tax calculated for region {} was 0'.format(
-                self.config['REGION']
-            )
+            'tax': 'You do not owe taxes in region {}'.format(this_region)
         }
