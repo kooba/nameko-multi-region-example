@@ -1,9 +1,8 @@
-import kombu.serialization
 from kombu import Exchange, Queue
 from kombu.common import maybe_declare
 from nameko.amqp import get_connection, get_producer
 from nameko.constants import AMQP_URI_CONFIG_KEY, DEFAULT_SERIALIZER
-from nameko.exceptions import UnserializableValueError, serialize
+from nameko.exceptions import serialize
 from nameko.messaging import Consumer as NamekoConsumer
 
 REGIONS = ['europe', 'asia', 'america']
@@ -22,6 +21,11 @@ order_queue = Queue(
 
 
 class ReplyConsumer(NamekoConsumer):
+    """Custom implementation of Nameko Consumer
+
+    Consumes messages from queue in current region and sends a reply
+    to a federated queue defined in `reply_to` message property.
+    """
 
     def __init__(self, **kwargs):
         super(ReplyConsumer, self).__init__(None, kwargs)
@@ -35,7 +39,7 @@ class ReplyConsumer(NamekoConsumer):
         super(ReplyConsumer, self).setup()
         config = self.container.config
 
-        """Region specific queue"""
+        """Declare consumer queue for this service in current region"""
         self.queue = Queue(
             exchange=orders_exchange,
             routing_key='{}_{}'.format(
@@ -47,47 +51,27 @@ class ReplyConsumer(NamekoConsumer):
             )
         )
 
-        """Bind reply queues for all regions to `orders` exchange"""
-        with get_connection(config[AMQP_URI_CONFIG_KEY]) as conn:
+        """Bind federated queues in all regions to
+            `orders` exchange with correct routing key.
+        """
+        with get_connection(config[AMQP_URI_CONFIG_KEY]) as connection:
 
-            maybe_declare(orders_exchange, conn)
+            maybe_declare(orders_exchange, connection)
 
-            for region in REGIONS:
-
-                maybe_declare(Queue(
-                    exchange=orders_exchange,
-                    routing_key='{}_{}'.format(
-                        region, ROUTING_KEY_CALCULATE_TAXES
-                    ),
-                    name='fed.{}_{}'.format(
-                        region, ROUTING_KEY_CALCULATE_TAXES
-                    )
-                ), conn)
-
-                maybe_declare(Queue(
-                    exchange=orders_exchange,
-                    routing_key='{}_{}'.format(
-                        region, ROUTING_KEY_CALCULATE_TAXES_REPLY
-                    ),
-                    name='fed.{}_{}'.format(
-                        region, ROUTING_KEY_CALCULATE_TAXES_REPLY
-                    )
-                ), conn)
+            self._bind_queues_in_for_all_regions(
+                ROUTING_KEY_CALCULATE_TAXES, connection
+            )
+            self._bind_queues_in_for_all_regions(
+                ROUTING_KEY_CALCULATE_TAXES_REPLY, connection
+            )
 
     def send_response(self, message, result, exc_info):
+
+        config = self.container.config
 
         error = None
         if exc_info is not None:
             error = serialize(exc_info[1])
-
-        try:
-            kombu.serialization.dumps(result, DEFAULT_SERIALIZER)
-        except Exception:
-            # `error` below is guaranteed to serialize to json
-            error = serialize(UnserializableValueError(result))
-            result = None
-
-        config = self.container.config
 
         with get_producer(config[AMQP_URI_CONFIG_KEY]) as producer:
 
@@ -104,13 +88,25 @@ class ReplyConsumer(NamekoConsumer):
 
         return result, error
 
+    def _bind_queues_in_for_all_regions(self, routing_key, connection):
+        for region in REGIONS:
+                maybe_declare(Queue(
+                    exchange=orders_exchange,
+                    routing_key='{}_{}'.format(
+                        region, routing_key
+                    ),
+                    name='fed.{}_{}'.format(
+                        region, routing_key
+                    )
+                ), connection)
+
 consume_and_reply = ReplyConsumer.decorator
 
 
 class DynamicConsumer(NamekoConsumer):
     """
     Alternative implementation of nameko.messaging.Consumer
-    to allow for dynamic queue name declaration.
+    to allow for dynamic reply queue name declaration.
     """
     def __init__(self, **kwargs):
         super(DynamicConsumer, self).__init__(None, kwargs)

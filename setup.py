@@ -7,7 +7,7 @@ setup(
     description='Shows example of multi region messaging with Nameko',
     packages=find_packages(exclude=['test', 'test.*']),
     install_requires=[
-        'nameko==2.5.1',
+        'nameko==2.5.3',
         'marshmallow==2.9.1',
         'eventlet==0.20.1'
     ],

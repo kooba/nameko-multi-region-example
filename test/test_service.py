@@ -6,9 +6,11 @@ from nameko.exceptions import ExtensionNotFound
 from nameko.standalone.events import event_dispatcher
 from nameko.testing.services import entrypoint_waiter, entrypoint_hook
 
-from src.service import (
-    CACHE, ROUTING_KEY_ORDER_PRODUCT, orders_exchange, ProductsService
+from src.messaging import (
+    ROUTING_KEY_CALCULATE_TAXES, ROUTING_KEY_CALCULATE_TAXES_REPLY,
+    ROUTING_KEY_ORDER_PRODUCT, orders_exchange
 )
+from src.service import CACHE, ProductsService
 
 
 @pytest.fixture
@@ -71,6 +73,19 @@ class TestProductService:
             routing_key=ROUTING_KEY_ORDER_PRODUCT
         )] == products_service.order_product_publisher.call_args_list
 
+    def test_will_fail_ordering_product(self, products_service, web_session):
+        payload = {}
+        response = web_session.post('/orders', data=json.dumps(payload))
+        assert response.status_code == 400
+        assert response.json() == {
+            'message': {
+                'quantity': ['Missing data for required field.'],
+                'product_id': ['Missing data for required field.']
+            },
+            'error': 'BAD_REQUEST'
+        }
+        assert not products_service.order_product_publisher.called
+
     def test_will_consume_order(self, products_service, publish, data):
         payload = {'quantity': 1, 'product_id': 1}
         with entrypoint_waiter(
@@ -99,6 +114,39 @@ class TestProductService:
                 pass
         assert "No entrypoint for 'consume_order' found" in str(exc_info.value)
 
+    def test_will_request_tax_calculation(
+        self, products_service, web_session, config
+    ):
+        this_region = config['REGION']
+        tax_region = 'asia'
+        response = web_session.post('/tax/{}'.format(tax_region))
+        assert response.status_code == 200
+        assert [
+            call(
+                {'order_id': 1},
+                reply_to='{}_calculate_taxes_reply'.format(this_region),
+                routing_key='{}_calculate_taxes'.format(tax_region)
+            )
+        ] == products_service.calculate_taxes_publisher.call_args_list
+
+    def test_will_consume_tax_calculation_results(
+        self, products_service, publish, config
+    ):
+        payload = {'order_id': 1}
+
+        with patch('src.service.logging') as logging:
+            with entrypoint_waiter(
+                products_service.container, 'consume_tax_calculation'
+            ):
+                publish(
+                    payload,
+                    '{}_{}'.format(
+                        config['REGION'], ROUTING_KEY_CALCULATE_TAXES_REPLY
+                    ),
+                    exchange=orders_exchange
+                )
+        assert logging.info.call_args_list == [call(payload)]
+
 
 class TestIndexerService:
 
@@ -123,3 +171,41 @@ class TestIndexerService:
         assert CACHE[payload['id']] == payload
 
 
+class TestTaxesService:
+
+    def test_will_calculate_taxes(self, taxes_service, publish, config):
+        payload = {'order_id': 1}
+        region = config['REGION']
+        with entrypoint_waiter(
+            taxes_service.container, 'calculate_taxes'
+        ) as results:
+            publish(
+                payload,
+                '{}_{}'.format(region, ROUTING_KEY_CALCULATE_TAXES),
+                exchange=orders_exchange
+            )
+        assert results.get() == {
+            'tax': 'You do not owe taxes in region {} for order id {}'.format(
+                region, payload['order_id']
+            )
+        }
+
+    def test_will_fail_calculating_taxes(self, taxes_service, publish, config):
+        payload = {}
+        region = config['REGION']
+        with entrypoint_waiter(
+            taxes_service.container, 'calculate_taxes'
+        ) as results:
+            publish(
+                payload,
+                '{}_{}'.format(region, ROUTING_KEY_CALCULATE_TAXES),
+                exchange=orders_exchange
+            )
+        assert results.exc_info == {
+            'exc_path': 'marshmallow.exceptions.ValidationError',
+            'value': "{'order_id': ['Missing data for required field.']}",
+            'exc_args': [{
+                'order_id': ['Missing data for required field.']
+            }],
+            'exc_type': 'ValidationError'
+        }

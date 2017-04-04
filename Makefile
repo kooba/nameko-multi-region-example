@@ -77,6 +77,11 @@ setup-federation: federation-upstreams federation-exchange-policy federation-que
 
 build-and-deploy: build-all push-to-docker-hub deploy-services setup-federation
 
+coverage:
+	flake8 src test
+	coverage run --concurrency=eventlet --source=src -m pytest test $(ARGS)
+	coverage report -m --fail-under 100
+
 # Handy utility commands
 
 list-services:
@@ -133,4 +138,4 @@ order-product:
 	-d '{"product_id": 1, "quantity": 1}'
 
 calculate-tax:
-	curl -XPOST $$(docker-machine ip europe):8000/tax/asia -d '{"foo": "bar"}'
+	curl -XPOST $$(docker-machine ip europe):8000/tax/asia

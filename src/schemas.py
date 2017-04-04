@@ -11,3 +11,7 @@ class Product(Schema):
 class Order(Schema):
     product_id = fields.Int(required=True)
     quantity = fields.Int(required=True)
+
+
+class Taxes(Schema):
+    order_id = fields.Int(required=True)

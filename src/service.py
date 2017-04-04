@@ -12,7 +12,7 @@ from .messaging import (
     orders_exchange, ROUTING_KEY_CALCULATE_TAXES,
     ROUTING_KEY_CALCULATE_TAXES_REPLY, ROUTING_KEY_ORDER_PRODUCT
 )
-from .models import Order, Product
+from .schemas import Order, Product, Taxes
 
 CACHE = {}
 
@@ -122,14 +122,17 @@ class ProductsService:
             'product_update', Product(strict=True).dump(product).data
         )
 
-    @http('POST', '/tax/<string:region>')
-    def calculate_tax(self, request, region):
+    @http('POST', '/tax/<string:remote_region>')
+    def calculate_tax(self, request, remote_region):
 
         this_regions = self.config['REGION']
+        payload = {'order_id': 1}
 
         self.calculate_taxes_publisher(
-            {},
-            routing_key="{}_{}".format(region, ROUTING_KEY_CALCULATE_TAXES),
+            payload,
+            routing_key="{}_{}".format(
+                remote_region, ROUTING_KEY_CALCULATE_TAXES
+            ),
             reply_to="{}_{}".format(
                 this_regions, ROUTING_KEY_CALCULATE_TAXES_REPLY
             )
@@ -137,7 +140,7 @@ class ProductsService:
         return 200, ''
 
     @consume_reply()
-    def record_tax_calculation(self, payload):
+    def consume_tax_calculation(self, payload):
         logging.info(payload)
 
 
@@ -180,8 +183,12 @@ class TaxesService:
 
     @consume_and_reply()
     def calculate_taxes(self, payload):
+
+        request = Taxes(strict=True).load(payload).data
         this_region = self.config['REGION']
         logging.info("Received request in {}".format(this_region))
         return {
-            'tax': 'You do not owe taxes in region {}'.format(this_region)
+            'tax': 'You do not owe taxes in region {} for order id {}'.format(
+                this_region, request['order_id']
+            )
         }

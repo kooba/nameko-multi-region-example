@@ -11,7 +11,8 @@ from nameko.cli.main import setup_yaml_parser
 from nameko.constants import AMQP_URI_CONFIG_KEY
 from nameko.testing.services import replace_dependencies
 
-from src.service import IndexerService, ProductsService
+from src.messaging import orders_exchange
+from src.service import IndexerService, ProductsService, TaxesService
 
 
 @pytest.fixture(scope="session")
@@ -65,13 +66,19 @@ def create_service_meta(container_factory, config):
 @pytest.fixture
 def products_service(create_service_meta):
     return create_service_meta(
-        ProductsService, 'dispatch', 'order_product_publisher'
+        ProductsService, 'dispatch', 'order_product_publisher',
+        'calculate_taxes_publisher'
     )
 
 
 @pytest.fixture
 def indexer_service(create_service_meta):
     return create_service_meta(IndexerService)
+
+
+@pytest.fixture
+def taxes_service(create_service_meta):
+    return create_service_meta(TaxesService)
 
 
 @pytest.fixture
@@ -92,3 +99,15 @@ def publish(config):
                     **kwargs)
 
     return publish
+
+
+@pytest.fixture(autouse=True)
+def commute_exchange():
+    """Ensure exchanges are not bound to channels from previous test runs.
+
+    This fixtures is temporary and should be removed once changes from
+    https://github.com/mattbennett/nameko/pull/7/files land in nameko
+    codebase and frontend_facade.publishers.Publisher is updated
+    """
+    yield
+    orders_exchange._channel = None
