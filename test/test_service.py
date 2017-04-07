@@ -98,7 +98,7 @@ class TestProductService:
             )
         assert products_service.dispatch.call_args_list == [
             call(
-                'product_update',
+                'product_updated',
                 {'quantity': 99, 'id': 1, 'name': 'Tesla', 'price': '100.0'}
             )
         ]
@@ -159,6 +159,16 @@ class TestIndexerService:
 
         with entrypoint_waiter(container, 'handle_product_added'):
             dispatch('products', 'product_added', payload)
+        assert CACHE[payload['id']] == payload
+
+    def test_will_update_cache(self, indexer_service, config, data):
+        payload = {'price': 101.0, 'name': 'Tesla', 'id': 1, 'quantity': 99}
+
+        container = indexer_service.container
+        dispatch = event_dispatcher(config)
+
+        with entrypoint_waiter(container, 'handle_product_updated'):
+            dispatch('products', 'product_updated', payload)
         assert CACHE[payload['id']] == payload
 
 

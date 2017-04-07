@@ -98,7 +98,7 @@ class ProductsService:
         # Write to master database here...
 
         self.dispatch(
-            'product_update', Product(strict=True).dump(product).data
+            'product_updated', Product(strict=True).dump(product).data
         )
 
     @http('POST', '/tax/<string:remote_region>')
@@ -133,8 +133,22 @@ class IndexerService:
         handler_type=BROADCAST, reliable_delivery=False
     )
     def handle_product_added(self, payload):
-        logging.info("Handling product add: {}".format(payload))
+        logging.info("Handling product added: {}".format(payload))
         payload = Product(strict=True).load(payload).data
+        self.cache.update(
+            payload['id'],
+            payload
+        )
+
+    @event_handler(
+        'products', 'product_updated',
+        handler_type=BROADCAST, reliable_delivery=False
+    )
+    def handle_product_updated(self, payload):
+        logging.info("Handling product updated: {}".format(payload))
+        payload = Product(strict=True).load(payload).data
+        product = self.cache.get(payload['id'])
+        product.update(payload)
         self.cache.update(
             payload['id'],
             payload

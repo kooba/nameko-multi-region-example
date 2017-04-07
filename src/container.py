@@ -7,6 +7,17 @@ logger = logging.getLogger(__name__)
 
 
 class ServiceContainer(NamekoServiceContainer):
+    """Custom implementation of Nameko's ServiceContainer
+
+    Right before Nameko starts our container, we will remove any entrypoints
+    which have been listed in `ENTRYPOINT_BLACKLIST` section of the service's
+    config file.
+
+    To enable custom ServiceContainer implementation we have to tell Nameko
+    about its location by setting `SERVICE_CONTAINER_CLS` config value
+    to the location of this class:
+    `SERVICE_CONTAINER_CLS: src.container.ServiceContainer`
+    """
 
     def start(self):
         blacklist = self.config.get('ENTRYPOINT_BLACKLIST') or ()
