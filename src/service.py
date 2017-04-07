@@ -3,39 +3,17 @@ import logging
 
 from marshmallow import ValidationError
 from nameko.events import EventDispatcher, event_handler, BROADCAST
-from nameko.extensions import DependencyProvider
+
 from nameko.messaging import Publisher, consume
 from nameko.web.handlers import http
 
+from .dependencies import Cache, Config
 from .messaging import (
     consume_and_reply, consume_reply, order_queue,
     orders_exchange, ROUTING_KEY_CALCULATE_TAXES,
     ROUTING_KEY_CALCULATE_TAXES_REPLY, ROUTING_KEY_ORDER_PRODUCT
 )
 from .schemas import Order, Product, Taxes
-
-CACHE = {}
-
-
-class Cache(DependencyProvider):
-
-    class CacheApi:
-        def __init__(self, cache):
-            self.cache = cache
-
-        def update(self, key, value):
-            self.cache[key] = value
-
-        def get(self, key):
-            return self.cache.get(key)
-
-    def get_dependency(self, worker_ctx):
-        return self.CacheApi(CACHE)
-
-
-class Config(DependencyProvider):
-    def get_dependency(self, worker_ctx):
-        return self.container.config.copy()
 
 
 class ProductsService:
@@ -64,7 +42,8 @@ class ProductsService:
         """ Add product to cache in every region
 
         This endpoint can be called in any region and will dispatch event
-        which will be handled by indexer's `handle_product_add` in all regions
+        which will be handled by indexer's `handle_product_added`
+        in all regions
         """
         try:
             payload = Product(strict=True).loads(
@@ -75,7 +54,7 @@ class ProductsService:
                 'error': 'BAD_REQUEST',
                 'message': err.messages
             })
-        self.dispatch('product_add', Product(strict=True).dump(payload).data)
+        self.dispatch('product_added', Product(strict=True).dump(payload).data)
         return 200, ''
 
     @http('POST', '/orders')
@@ -150,26 +129,12 @@ class IndexerService:
     cache = Cache()
 
     @event_handler(
-        'products', 'product_add',
+        'products', 'product_added',
         handler_type=BROADCAST, reliable_delivery=False
     )
-    def handle_product_add(self, payload):
+    def handle_product_added(self, payload):
         logging.info("Handling product add: {}".format(payload))
         payload = Product(strict=True).load(payload).data
-        self.cache.update(
-            payload['id'],
-            payload
-        )
-
-    @event_handler(
-        'products', 'product_update',
-        handler_type=BROADCAST, reliable_delivery=False
-    )
-    def handle_product_update(self, payload):
-        logging.info("Handling product update: {}".format(payload))
-        payload = Product(strict=True).load(payload).data
-        product = self.cache.get(payload['id'])
-        product.update(payload)
         self.cache.update(
             payload['id'],
             payload

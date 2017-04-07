@@ -6,11 +6,12 @@ from nameko.exceptions import ExtensionNotFound
 from nameko.standalone.events import event_dispatcher
 from nameko.testing.services import entrypoint_waiter, entrypoint_hook
 
+from src.dependencies import CACHE
 from src.messaging import (
     ROUTING_KEY_CALCULATE_TAXES, ROUTING_KEY_CALCULATE_TAXES_REPLY,
     ROUTING_KEY_ORDER_PRODUCT, orders_exchange
 )
-from src.service import CACHE, ProductsService
+from src.service import ProductsService
 
 
 @pytest.fixture
@@ -47,7 +48,7 @@ class TestProductService:
         response = web_session.post('/products', data=json.dumps(payload))
         assert response.status_code == 200
         assert products_service.dispatch.call_args_list == [
-            call('product_add', payload)
+            call('product_added', payload)
         ]
 
     def test_fail_adding_product(self, products_service, web_session):
@@ -156,18 +157,8 @@ class TestIndexerService:
         container = indexer_service.container
         dispatch = event_dispatcher(config)
 
-        with entrypoint_waiter(container, 'handle_product_add'):
-            dispatch('products', 'product_add', payload)
-        assert CACHE[payload['id']] == payload
-
-    def test_will_update_cache(self, indexer_service, config, data):
-        payload = {'price': 101.0, 'name': 'Tesla', 'id': 1, 'quantity': 100}
-
-        container = indexer_service.container
-        dispatch = event_dispatcher(config)
-
-        with entrypoint_waiter(container, 'handle_product_update'):
-            dispatch('products', 'product_update', payload)
+        with entrypoint_waiter(container, 'handle_product_added'):
+            dispatch('products', 'product_added', payload)
         assert CACHE[payload['id']] == payload
 
 
