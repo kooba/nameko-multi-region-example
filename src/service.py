@@ -103,6 +103,8 @@ class ProductsService:
 
     @http('POST', '/tax/<string:remote_region>')
     def calculate_tax(self, request, remote_region):
+        """ Send tax calculation request to desired region.
+        """
 
         this_regions = self.config['REGION']
         payload = {'order_id': 1}
@@ -120,6 +122,8 @@ class ProductsService:
 
     @consume_reply()
     def consume_tax_calculation(self, payload):
+        """ Consume tax calculation responses coming back from any regions.
+        """
         logging.info(payload)
 
 
@@ -162,6 +166,12 @@ class TaxesService:
 
     @consume_and_reply()
     def calculate_taxes(self, payload):
+        """ Consume tax calculation request coming from any region and send
+        a reply back to the same region.
+
+        Please look at src.messaging.ReplyConsumer
+        for the details of implementation
+        """
 
         request = Taxes(strict=True).load(payload).data
         this_region = self.config['REGION']
