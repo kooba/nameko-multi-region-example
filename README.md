@@ -74,7 +74,7 @@ You will have to change docker-compose file to use them.
 ## Events
 
 ```sh
-# Get IP for one of our nodes
+# Get IP for one of the nodes
 $ docker-machine ip europe
 192.168.99.100
 
@@ -107,11 +107,11 @@ $ curl 192.168.99.1002:8000/products/1
 ## Message processing in master region
 
 ```sh
-# Get IP for our master nodes
+# Get IP for master node
 $ docker-machine ip europe
 192.168.99.100
 
-# Ensure we already have a product from previous example
+# Ensure you already have a product from previous example
 $ curl 192.168.99.100:8000/products/1
 {"name": "Tesla", "quantity": 100, "price": "100.00", "id": 1}
 
@@ -135,7 +135,7 @@ $ docker logs nameko-multi-region-example-products
 ## Asynchronous two-way messaging
 
 ```sh
-# Get IP for our master nodes
+# Get IP for one of the nodes
 $ docker-machine ip europe
 192.168.99.100
 
