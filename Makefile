@@ -77,6 +77,8 @@ setup-federation: federation-upstreams federation-exchange-policy federation-que
 
 build-and-deploy: build-all push-to-docker-hub deploy-services setup-federation
 
+deploy: deploy-services setup-federation
+
 coverage:
 	flake8 src test
 	coverage run --concurrency=eventlet --source=src -m pytest test $(ARGS)
