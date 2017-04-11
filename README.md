@@ -10,13 +10,13 @@ in different regions can be accomplished with the help of Nameko framework.
 Three different use cases will show how messages can be distributed
 between three different regions.
 
-*Events:* Dispatch events by a service in one region and handle
+**Events:** Dispatch events by a service in one region and handle
 them by services in all regions. 
 
-*Message processing in master region:* Send message from a service in any
+**Message processing in master region:** Send message from a service in any
 region and process it by service in only one region.
 
-*Asynchronous two-way messaging:* Send a message to specific region and
+**Asynchronous two-way messaging:** Send a message to specific region and
 receive reply back in originating region.
 
 ## Setup
