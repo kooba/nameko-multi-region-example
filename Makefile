@@ -92,6 +92,11 @@ list-services:
 		eval $$(docker-machine env $$region) && docker ps; \
 	done
 
+restart-services:
+	@for region in $(REGIONS) ; do \
+		eval $$(docker-machine env $$region) && docker restart nameko-multi-region-example-products; \
+	done
+
 docker-command:
 	@eval $$(docker-machine env $(R)) && $(CMD)
 
@@ -129,15 +134,15 @@ run-service:
 
 # Commans from example
 get-product:
-	curl $$(docker-machine ip europe):8000/products/1
+	curl 192.168.99.100:8000/products/1
 
 add-product:
-	curl -XPOST $$(docker-machine ip europe):8000/products \
+	curl -XPOST 192.168.99.100:8000/products \
 	-d '{"price": "100.00", "name": "Tesla", "id": 1, "quantity": 100}'
 
 order-product:
-	curl -XPOST $$(docker-machine ip asia):8000/orders \
+	curl -XPOST 192.168.99.101:8000/orders \
 	-d '{"product_id": 1, "quantity": 1}'
 
 calculate-tax:
-	curl -XPOST $$(docker-machine ip europe):8000/tax/asia
+	curl -XPOST 192.168.99.100:8000/tax/asia
