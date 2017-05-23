@@ -5,6 +5,9 @@ Distributed systems are often hosted in geographically dispersed data centers.
 This repository contains example showing how messaging between services
 in different regions can be accomplished with the help of Nameko framework.
 
+*Blog Post:*
+https://medium.com/@JakubBorys/multi-region-messaging-with-nameko-685507f122c2
+
 ## Use Cases
 
 Three different use cases will show how messages can be distributed
